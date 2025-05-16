@@ -19,7 +19,7 @@ final class Requests {
     private let endpoint: EndPoint
     
     /// Path components for API, if any
-    private let pathComponents: Set<String>
+    private let pathComponents: [String]
     
     /// Query arguments for API, for any
     private let queryParameters: [URLQueryItem]
@@ -29,13 +29,13 @@ final class Requests {
         var string = Constants.baseURL
         string += "/"
         string += endpoint.rawValue
-                
+        
         if !pathComponents.isEmpty {
             pathComponents.forEach ({
                 string += "/\($0)"
             })
         }
-                
+        
         if !queryParameters.isEmpty {
             string += "?"
             // name=value&name=value
@@ -67,11 +67,55 @@ final class Requests {
     ///   - queryParameters: Collection of query parameters
     public init(
         endpoint: EndPoint,
-        pathComponents: Set<String> = [],
+        pathComponents: [String] = [],
         queryParameters: [URLQueryItem] = []
     ) {
         self.endpoint = endpoint
         self.pathComponents = pathComponents
         self.queryParameters = queryParameters
     }
+    
+    convenience init?(url: URL) {
+        let string = url.absoluteString
+        if !string.contains(Constants.baseURL) {
+            return nil
+        }
+        let trimmed = string.replacingOccurrences(of: Constants.baseURL+"/", with: "")
+        if trimmed.contains("/") {
+            let components = trimmed.components(separatedBy: "/")
+            if !components.isEmpty {
+                let endpointString = components[0]
+                if let enpoint = EndPoint(rawValue: endpointString) {
+                    self.init(endpoint: enpoint)
+                    return
+                }
+            }
+            
+        } else if trimmed.contains("?") {
+            let components = trimmed.components(separatedBy: "?")
+            if !components.isEmpty, components.count >= 2 {
+                let endpointString = components[0]
+                let queryItemsString = components[1]
+                let queryItems: [URLQueryItem] = queryItemsString.components(separatedBy: "&").compactMap({
+                    guard $0.contains("=") else {
+                        return nil
+                    }
+                    let parts = $0.components(separatedBy: "=")
+                    
+                    return URLQueryItem(
+                        name: parts[0],
+                        value: parts[1])
+                })
+                if let enpoint = EndPoint(rawValue: endpointString) {
+                    self.init(endpoint: enpoint, queryParameters: queryItems)
+                    return
+                }
+            }
+        }
+        return nil
+    }
+}
+
+extension Requests {
+    static let listCharacterRequests = Requests(endpoint: .character)
 }
